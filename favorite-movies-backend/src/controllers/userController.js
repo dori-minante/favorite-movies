@@ -49,8 +49,64 @@ const getAllUsers = async (req, res) => {
   }
 };
 
+const updateUser = async (req, res) => {
+  const { id } = req.params;
+  const { name, email, password, role } = req.body;
+
+  try {
+    const existingUser = await prisma.user.findUnique({ where: { id: Number(id) } });
+
+    if (!existingUser) {
+      return res.status(404).json({ message: 'Usuário não encontrado.' });
+    }
+
+    let hashedPassword = existingUser.password;
+    if (password) {
+      hashedPassword = await bcrypt.hash(password, 10);
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: Number(id) },
+      data: {
+        name,
+        email,
+        password: hashedPassword,
+        role
+      },
+    });
+
+    return res.status(200).json({ message: 'Usuário atualizado com sucesso!', user: updatedUser });
+  } catch (error) {
+    console.error('Erro ao atualizar usuário:', error);
+    return res.status(500).json({ message: 'Erro no servidor.' });
+  }
+};
+
+const deleteUser = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const existingUser = await prisma.user.findUnique({ where: { id: Number(id) } });
+
+    if (!existingUser) {
+      return res.status(404).json({ message: 'Usuário não encontrado.' });
+    }
+
+    await prisma.user.delete({ where: { id: Number(id) } });
+
+    return res.status(200).json({ message: 'Usuário deletado com sucesso!' });
+  } catch (error) {
+    console.error('Erro ao deletar usuário:', error);
+    return res.status(500).json({ message: 'Erro no servidor.' });
+  }
+};
+
 module.exports = {
   createUser,
-  getAllUsers
+  getAllUsers,
+  updateUser,
+  deleteUser
 };
+
+
 
