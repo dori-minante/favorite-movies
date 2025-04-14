@@ -1,6 +1,8 @@
 const bcrypt = require('bcrypt');
 const prisma = require('../models/prismaClient');
 
+// Usamos req.user que vem do middleware authenticateToken (decodificado do token)
+
 const createUser = async (req, res) => {
   const { name, email, password, role } = req.body;
 
@@ -53,8 +55,16 @@ const updateUser = async (req, res) => {
   const { id } = req.params;
   const { name, email, password, role } = req.body;
 
+  const userId = Number(id);
+  const loggedUser = req.user;
+
+  // Permitir que apenas admins ou o próprio usuário atualizem os dados
+  if (loggedUser.role !== 'admin' && loggedUser.id !== userId) {
+    return res.status(403).json({ message: 'Você não tem permissão para atualizar este usuário.' });
+  }
+
   try {
-    const existingUser = await prisma.user.findUnique({ where: { id: Number(id) } });
+    const existingUser = await prisma.user.findUnique({ where: { id: userId } });
 
     if (!existingUser) {
       return res.status(404).json({ message: 'Usuário não encontrado.' });
@@ -66,12 +76,12 @@ const updateUser = async (req, res) => {
     }
 
     const updatedUser = await prisma.user.update({
-      where: { id: Number(id) },
+      where: { id: userId },
       data: {
         name,
         email,
         password: hashedPassword,
-        role
+        role: loggedUser.role === 'admin' ? role : existingUser.role // só admin pode alterar role
       },
     });
 
@@ -84,15 +94,22 @@ const updateUser = async (req, res) => {
 
 const deleteUser = async (req, res) => {
   const { id } = req.params;
+  const userId = Number(id);
+  const loggedUser = req.user;
+
+  // Permitir que apenas admins ou o próprio usuário deletem
+  if (loggedUser.role !== 'admin' && loggedUser.id !== userId) {
+    return res.status(403).json({ message: 'Você não tem permissão para deletar este usuário.' });
+  }
 
   try {
-    const existingUser = await prisma.user.findUnique({ where: { id: Number(id) } });
+    const existingUser = await prisma.user.findUnique({ where: { id: userId } });
 
     if (!existingUser) {
       return res.status(404).json({ message: 'Usuário não encontrado.' });
     }
 
-    await prisma.user.delete({ where: { id: Number(id) } });
+    await prisma.user.delete({ where: { id: userId } });
 
     return res.status(200).json({ message: 'Usuário deletado com sucesso!' });
   } catch (error) {
@@ -101,12 +118,40 @@ const deleteUser = async (req, res) => {
   }
 };
 
+const getMyProfile = async (req, res) => {
+  const userId = req.user.id;
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        createdAt: true
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: 'Usuário não encontrado.' });
+    }
+
+    return res.status(200).json(user);
+  } catch (error) {
+    console.error('Erro ao buscar perfil:', error);
+    return res.status(500).json({ message: 'Erro no servidor.' });
+  }
+};
+
 module.exports = {
   createUser,
   getAllUsers,
   updateUser,
-  deleteUser
+  deleteUser,
+  getMyProfile
 };
+
 
 
 
