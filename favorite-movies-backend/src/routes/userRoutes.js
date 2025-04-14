@@ -3,9 +3,13 @@ const router = express.Router();
 
 const { createUser, getAllUsers, updateUser, deleteUser } = require('../controllers/userController');
 
-router.post('/', createUser);
-router.get('/', getAllUsers);
-router.put('/:id', updateUser);
-router.delete('/:id', deleteUser); 
+const { authenticateToken, isAdmin } = require('../middlewares/authMiddleware');
+
+router.post('/', createUser); //cadastro aberto
+
+//protegidas com token + admin
+router.get('/', authenticateToken, isAdmin, getAllUsers);
+router.put('/:id', authenticateToken, isAdmin, updateUser);
+router.delete('/:id', authenticateToken, isAdmin, deleteUser);
 
 module.exports = router;
